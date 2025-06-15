@@ -1,0 +1,9 @@
+<component name="libraryTable">
+  <library name="ejml-core-0.41">
+    <CLASSES>
+      <root url="jar://$PROJECT_DIR$/../geotools-31.5/lib/ejml-core-0.41.jar!/" />
+    </CLASSES>
+    <JAVADOC />
+    <SOURCES />
+  </library>
+</component>

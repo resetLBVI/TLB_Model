@@ -1,0 +1,9 @@
+<component name="libraryTable">
+  <library name="jaxb-runtime-2.4.0-b180830.0438">
+    <CLASSES>
+      <root url="jar://$PROJECT_DIR$/../geotools-31.5/lib/jaxb-runtime-2.4.0-b180830.0438.jar!/" />
+    </CLASSES>
+    <JAVADOC />
+    <SOURCES />
+  </library>
+</component>

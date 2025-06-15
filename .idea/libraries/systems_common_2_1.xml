@@ -1,0 +1,9 @@
+<component name="libraryTable">
+  <library name="systems-common-2.1">
+    <CLASSES>
+      <root url="jar://$PROJECT_DIR$/../geotools-31.5/lib/systems-common-2.1.jar!/" />
+    </CLASSES>
+    <JAVADOC />
+    <SOURCES />
+  </library>
+</component>
