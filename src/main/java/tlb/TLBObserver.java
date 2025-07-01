@@ -9,10 +9,10 @@ public class TLBObserver implements Steppable {
     public void step(SimState simState) {
         TLBEnvironment eState = (TLBEnvironment) simState; //downcasting the TLB environment
         //collect population data in the last week of the year
-        if (eState.week %51 ==0) {
+//        if (eState.currentWeek % 51 ==0) {
             collectPopData (eState);
             reset(eState);
-        }
+//        }
     }
 
     /*
@@ -22,9 +22,10 @@ public class TLBObserver implements Steppable {
      */
     public void collectPopData (TLBEnvironment state) {
         //start writing
-        System.out.println("week " + state.week + " in Data Collection");
-        state.populationSize = state.agentGrids.getAllObjects().numObjs;
-        String popInfo = String.format("%s,%s,%s,%s,%s,%s,%s,%s", state.year, state.populationSize, state.numBirth, state.numDeath, state.numDeathInADULT,
+        System.out.println("week " + state.currentWeek + " in Data Collection");
+        System.out.println("num of death: " + state.numDeath) ;
+        state.populationSize = state.agentGrid.getAllObjects().numObjs;
+        String popInfo = String.format("%s,%s,%s,%s,%s,%s,%s,%s", state.currentYear, state.populationSize, state.numBirth, state.numDeath, state.numDeathInADULT,
                 state.numDeathINEGG, state.numDeathInLARVA, state.numDeathInPUPA);
         state.popSummaryWriter.addToFile(popInfo); //write to the file
     }

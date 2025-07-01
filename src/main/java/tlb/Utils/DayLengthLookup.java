@@ -38,7 +38,7 @@ public class DayLengthLookup {
                 .min(Comparator.comparingDouble(l -> Math.abs(l - latitude)))
                 .orElseThrow(() -> new IllegalStateException("No latitudes available"));
         List<Double> values = dayLengthTable.get(nearestLat);
-        return values.get(weekNumber - 1); // Week 1 => index 0
+        return values.get(weekNumber); // week starts with 0
     }
 
 

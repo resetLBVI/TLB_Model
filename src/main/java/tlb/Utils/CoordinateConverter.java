@@ -7,6 +7,7 @@ import org.geotools.coverage.grid.GridEnvelope2D;
 import org.geotools.coverage.grid.GridGeometry2D;
 import org.geotools.geometry.jts.ReferencedEnvelope;
 import org.geotools.geometry.Position2D;
+import tlb.TLBEnvironment;
 
 public class CoordinateConverter {
     public static int longitudeXtoGridX (double tlbLongX, double xllcorner, int cellSize) {
@@ -42,5 +43,13 @@ public class CoordinateConverter {
         System.out.println(coords[0]); //longitude supplied first
         System.out.println(coords[1]);
         return coords;
+    }
+
+    public static int getVegToDisplayX (TLBEnvironment state, int vegGridX) {
+        return vegGridX * state.agentGrid.getWidth() / state.vegetationRaster.getWidth();
+    }
+
+    public static int getVegToDisplayY (TLBEnvironment state, int vegGridY) {
+        return vegGridY * state.agentGrid.getWidth() / state.vegetationRaster.getHeight();
     }
 }
