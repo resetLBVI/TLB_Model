@@ -7,7 +7,7 @@ import java.util.HashMap;
 import java.util.Map;
 
 public class TamariskLookup {
-    private Map<Integer, Double> tamariskMap = new HashMap<>();
+    private static Map<Integer, Double> tamariskMap = new HashMap<>();
 
 
     public void loadPatchTamariskCSV(String filePath) {
@@ -30,7 +30,7 @@ public class TamariskLookup {
         }
     }
 
-    public Double getPTamarisk(int patchID) {
+    public static Double getPTamarisk(int patchID) {
         return tamariskMap.getOrDefault(patchID, 0.0); // default if not found
     }
 }

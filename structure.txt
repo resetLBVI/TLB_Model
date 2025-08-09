@@ -1,0 +1,45 @@
+.
+├── README.md
+├── RESET_TLB_20250509.iml
+├── out
+│   ├── artifacts
+│   │   └── RESET_TLB_20250509_jar
+│   │       └── RESET_TLB_20250509.jar
+│   └── production
+│       └── RESET_TLB_20250509
+│           ├── META-INF
+│           │   └── MANIFEST.MF
+│           ├── sim
+│           │   └── portrayal
+│           └── tlb
+│               ├── Stage.class
+│               ├── TLBAgent$1.class
+│               ├── TLBAgent.class
+│               ├── TLBEnvironment.class
+│               ├── TLBObserver.class
+│               ├── TLBTimer.class
+│               ├── TLBVegCell.class
+│               ├── TLBWorldWithUI$1.class
+│               ├── TLBWorldWithUI.class
+│               └── Utils
+├── src
+│   ├── Main.java
+│   └── main
+│       └── java
+│           ├── META-INF
+│           │   └── MANIFEST.MF
+│           ├── main
+│           ├── sim
+│           │   └── portrayal
+│           └── tlb
+│               ├── Stage.java
+│               ├── TLBAgent.java
+│               ├── TLBEnvironment.java
+│               ├── TLBObserver.java
+│               ├── TLBTimer.java
+│               ├── TLBVegCell.java
+│               ├── TLBWorldWithUI.java
+│               └── Utils
+└── structure.txt
+
+20 directories, 23 files

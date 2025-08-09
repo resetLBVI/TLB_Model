@@ -28,7 +28,6 @@ public class TLBWorldWithUI extends GUIState {
     Display2D display; //create a display
     JFrame displayFrame; //create a display frame
     SparseGridPortrayal2D backgroundPortrayal = new SparseGridPortrayal2D();
-//    SparseGridPortrayal2D TLBAgentPortrayal = new SparseGridPortrayal2D();
     SparseGridPortrayal2D TLBAgentPortrayal = new SparseGridPortrayal2D() {
         @Override
         public SimplePortrayal2D getPortrayalForObject(Object obj) {
@@ -77,7 +76,7 @@ public class TLBWorldWithUI extends GUIState {
         TLBEnvironment eState = (TLBEnvironment)state; //downcasting the TLBEnvironment
         String bgFileName;
         try {
-            bgFileName = OutputWriter.getFileName("/RESET_TLB_inputData/RESET_model_UI_background.jpg");
+            bgFileName = OutputWriter.getFileName("/RESET_TLB_inputData/RESET_model_UI_background.jpg", true);
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
@@ -86,21 +85,18 @@ public class TLBWorldWithUI extends GUIState {
         System.out.println ("image loaded: " + (img != null));
         //custom background portrayal using the background image
         // Assign portrayal
-//        backgroundPortrayal = new SparseGridPortrayal2D();
         backgroundPortrayal.setField(eState.backgroundGrid);
         backgroundPortrayal.setPortrayalForAll(new ScaledImagePortrayal(img));
 
         //agent portrayal (showing the agents as red dots)
         TLBAgentPortrayal.setField(eState.agentGrid);
-        TLBAgentPortrayal.setPortrayalForClass(TLBAgent.class, new OvalPortrayal2D(Color.BLACK, 0.2));
+        //remove this since it's not used
+//        TLBAgentPortrayal.setPortrayalForClass(TLBAgent.class, new OvalPortrayal2D(Color.BLACK, 0.2));
 
         //attach portryal to display
         display.detachAll();
         display.attach(backgroundPortrayal, "Image Layer", true);
         display.attach(TLBAgentPortrayal, "TLB Agents");
-
-//        TLBAgentPortrayal.setPortrayalForAll(new OvalPortrayal2D(Color.BLACK, 100));
-
         System.out.println("Number of Agents in UI: " + eState.agentGrid.allObjects.numObjs);
 
         display.setClipping(false);
@@ -117,6 +113,9 @@ public class TLBWorldWithUI extends GUIState {
     * ************************************************************************************
      */
     public static void main(String[] args) {
+        System.setProperty("org.geotools.referencing.forceXY", "true");
+        System.setProperty("org.geotools.referencing.factory.epsg",
+                "org.geotools.referencing.factory.epsg.ThreadedHsqlEpsgFactory");
         TLBWorldWithUI worldGUI = new TLBWorldWithUI();
         Console console = new Console(worldGUI);
         console.setVisible(true);

@@ -2,7 +2,6 @@ package tlb;
 
 
 import org.geotools.api.referencing.crs.CoordinateReferenceSystem;
-import org.geotools.api.referencing.operation.TransformException;
 import org.geotools.coverage.grid.GridCoverage2D;
 import org.geotools.coverage.grid.GridGeometry2D;
 import org.geotools.gce.geotiff.GeoTiffReader;
@@ -12,37 +11,35 @@ import sim.field.grid.ObjectGrid2D;
 import sim.field.grid.SparseGrid2D;
 import sim.util.Bag;
 import sim.util.Int2D;
-import tlb.Utils.CoordinateConverter;
-import tlb.Utils.OutputWriter;
-import tlb.Utils.TamariskLookup;
+import tlb.Utils.*;
+
 import java.awt.image.Raster;
 import java.io.File;
 import java.io.IOException;
-import java.util.HashMap;
 import java.util.Map;
 import static tlb.Utils.DayLengthLookup.loadDayLengthCsv;
 
 public class TLBEnvironment extends SimState {
     //input and output files path
+    public String debugFile = "RESET_TLB_debug.txt";
     public String logFile = "RESET_TLB_log.csv";
     public String agentSummaryFile = "RESET_TLB_agentSummary.csv";
     public String popSummaryFile = "RESET_TLB_popSummary.csv";
     public String impactFile = "RESET_TLB_impact.csv";
+    public OutputWriter debugWriter;
     public OutputWriter logWriter;
     public OutputWriter agentSummaryWriter;
     public OutputWriter popSummaryWriter;
     public OutputWriter impactWriter;
     //Environmental parameters are global
-//    DoubleGrid2D vegetationGrid;
-    public SparseGrid2D agentGrid;
-    public SparseGrid2D backgroundGrid;
-    public ObjectGrid2D vegCellGrid;
-    int displayWidth = 200;
-    int displayHeight = 200;
-    int initialN = 100;
-    double initialLon = 377950.966434972;
-    double initialLat = -492019.574922292;
-    //The following four variables are used in manually converting coordinates into grid system. Just in case the crs automation conversion not works
+    public SparseGrid2D agentGrid; //UI grid
+    public SparseGrid2D backgroundGrid; //UI grid
+    public ObjectGrid2D vegCellGrid; //efficient only if most cells are empty. For placing veg cell objects sparsely
+    int displayWidth = 100;
+    int displayHeight = 100;
+//    double initialLon = 377950.966434972;
+//    double initialLat = -492019.574922292;
+    //Coordination Converter: The following four variables are used in manually converting coordinates into grid system. Just in case the crs automation conversion not works
     double xllcornerVeg = -194862 + 15;
     double yllcornerVeg = -695325 + 15;
     int vegCellSize = 30;
@@ -50,9 +47,6 @@ public class TLBEnvironment extends SimState {
     //veg map instance variables
     public Raster vegetationRaster;
     public GridGeometry2D gridGeometry;
-    CoordinateReferenceSystem crs;
-//    GridGeometry2D gg;
-//    Raster tiffRaster;
     //Agent state variables
     int tlbAgentID = 0;
     //mortality
@@ -61,8 +55,6 @@ public class TLBEnvironment extends SimState {
     //reproduction
     int mpTlbSpawn = 5; //the maximum number of eggs
     int mpPatchTamariskForLaying = 2; //the patch tamarisk quantity for reproduction, double-check the number
-    //Diapause
-    int mpCriticalDayLength = 12; //a value representing critical day length i.e.,tlbCDL
     //Dispersal
     double mpTlbDisperse = 100; //the mean distance TLB agents travel in the environment, agents follow a negative exponential distribution with this mean
     double mpTlbInvade = 0.5; //the probability that TLB agents will enter the RESET study area each year
@@ -74,7 +66,7 @@ public class TLBEnvironment extends SimState {
     int mpTlbCarb; //how many times a cell containing tamarisk can be defoliated before it stops growing
     TamariskLookup tamariskLookup;
     //Scheduling
-    int currentYear = 0; //simulation period is 35 years from 1-35;
+    int currentYear = 0; //simulation period is 35 years from 0-34;
     int currentWeek = 0; //the week is from 0-51 in the current year
     //Population summary data
     int populationSize = 0; //current population size
@@ -94,44 +86,46 @@ public class TLBEnvironment extends SimState {
     public void start() {
         super.start();
         try{
-            //(0) debug
-
+            //(0) create debugFile
+            String[] debugHeader = {};
+            String debugFile = OutputWriter.getFileName(this.debugFile, false);
+            this.debugWriter = new OutputWriter(debugFile);
+            this.debugWriter.createFile(debugHeader);
             //(1) create logFile
             String[] logHeader = {"currentStep", "currentWeek", "currentYear", "agentID", "Stage", "currentAge", "longitude", "latitude",
-                    "vegGridX", "vegGridX", "displayX", "displayY", "actionExecuted"}; //currently collect 0 data
-            String logFile = OutputWriter.getFileName(this.logFile);
+                    "vegGridX", "vegGridX", "displayX", "displayY", "patchID", "actionExecuted"}; //currently collect 14 data
+            String logFile = OutputWriter.getFileName(this.logFile, false);
             this.logWriter = new OutputWriter(logFile);
             this.logWriter.createFile(logHeader);
             //(2) create agentSummaryFile
-            String[] weeklyAgentOutputHeader = {"step", "agentID", "birthday", "date of birth", "lon at birth",
+            String[] weeklyAgentOutputHeader = {"step", "agentID", "birthday", "date of death", "lon at birth",
                     "lat at birth", "patch at birth", "lon at death", "lat at death", "death stage", "death age"}; //currently collect 11 data
-            String agentSummaryFile = OutputWriter.getFileName(this.agentSummaryFile);
+            String agentSummaryFile = OutputWriter.getFileName(this.agentSummaryFile, false);
             this.agentSummaryWriter = new OutputWriter(agentSummaryFile);
             this.agentSummaryWriter.createFile(weeklyAgentOutputHeader);
             //(3) create popSummaryFile
             String[] popSummaryHeader = {"year", "Pop size", "Num of birth", "Num of death", "Num deaths in ADULT",
                     "Num death in EGG", "Num deaths in LARVA", "Num deaths in PUPA"}; //currently collect 8 data
-            String popSummaryFile = OutputWriter.getFileName(this.popSummaryFile);
+            String popSummaryFile = OutputWriter.getFileName(this.popSummaryFile, false);
             this.popSummaryWriter = new OutputWriter(popSummaryFile);
             this.popSummaryWriter.createFile(popSummaryHeader);
             //(4) create impactFile
-            String[] impacDataHeader = {"year", "x", "y", "patchID"}; //currently collect 4 data
-            String impactFile = OutputWriter.getFileName(this.impactFile);
+            String[] impacDataHeader = {"year", "week", "type", "x", "y", "patchID, numOfDefoliations"}; //currently collect 4 data
+            String impactFile = OutputWriter.getFileName(this.impactFile, false);
             this.impactWriter = new OutputWriter(impactFile);
             this.impactWriter.createFile(impacDataHeader);
             //(5) import tiff vegetation raster map - main raster map and then converting it to SparseGrid2D (vegGrids)
             importTiffVegRasterMap();
             //(6) import day length table
-            String dayLengthFilePath = OutputWriter.getFileName("/RESET_TLB_inputData/Weekly_dayLength.csv");
+            String dayLengthFilePath = OutputWriter.getFileName("/RESET_TLB_inputData/Weekly_dayLength.csv", true);
             System.out.println(dayLengthFilePath);
             loadDayLengthCsv(dayLengthFilePath);
             //(7) load the tamarisk data
-            String patchTamariskFilePath = OutputWriter.getFileName("/RESET_TLB_inputData/patch_tamarisk.csv");
+            String patchTamariskFilePath = OutputWriter.getFileName("/RESET_TLB_inputData/patch_tamarisk.csv", true);
             this.tamariskLookup = new TamariskLookup();
             tamariskLookup.loadPatchTamariskCSV(patchTamariskFilePath);
             //(8) create a background grid
             backgroundGrid = new SparseGrid2D(displayWidth, displayHeight);
-            System.out.println("background width: " + vegetationRaster.getWidth() + " height: " + vegetationRaster.getHeight());
             Object backgoundAnchor = new Object();
             backgroundGrid.setObjectLocation(backgoundAnchor, new Int2D(0,0)); //add dummy object to anchor the background image
             //debug
@@ -148,55 +142,31 @@ public class TLBEnvironment extends SimState {
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
-        //(9.0) initiate timer just to update the time
+        //(10) initiate timer just to update the time
         TLBTimer systemTimer = new TLBTimer();
         schedule.scheduleRepeating(Schedule.EPOCH, 0, systemTimer);
-        //(9.1) make agents
+        //(11) make agents
         try {
             makeAgentsInSpace();
-        } catch (TransformException e) {
+        } catch (IOException e) {
             throw new RuntimeException(e);
         }
-        //(10) initiate observer
+        //(12) initiate observer
         TLBObserver observer = new TLBObserver();
         schedule.scheduleRepeating(Schedule.EPOCH, Integer.MAX_VALUE, observer);
         System.out.println("-----------------Finish Starting TLB environment-------------------------");
     }
 
-//    public void importTiffVegRasterMap() throws IOException {
-//        String tifVegRasterMapFile = OutputWriter.getFileName("/RESET_TLB_inputData/vegRaster_Tamarisk_20240730.tif");
-//        File tiffVegRaster_tamarisk = new File(tifVegRasterMapFile); // the file name is TBD
-//        GeoTiffReader reader = new GeoTiffReader(tiffVegRaster_tamarisk); //read the tiff file
-//        GridCoverage2D cov = reader.read(null);
-//
-//        tiffRaster = cov.getRenderedImage().getData();
-//        //get x, y bounds
-//        System.out.println ("Raster bounds = " + tiffRaster.getBounds());
-//        //get lon, lat bounds (longitude supplied first)
-//        System.out.println(cov.getEnvelope());
-//        //making use of the coordinate reference system
-//        crs = cov.getCoordinateReferenceSystem2D();
-//        //return a math transform for the two-dimensional part for conversion from world to grid coordinates.
-//        gg = cov.getGridGeometry();
-//        //NEW
-//        System.out.println ("Width = " + tiffRaster.getWidth());
-//        System.out.println ("Height = " + tiffRaster.getHeight());
-//        vegetationGrid = new DoubleGrid2D(tiffRaster.getWidth(), tiffRaster.getHeight());
-//        for (int x = 0; x < tiffRaster.getWidth(); x++) {
-//            for (int y = 0; y < tiffRaster.getHeight(); y++) {
-//                double value = tiffRaster.getSampleDouble(x, y, 0); // assumes 1 band
-//                vegetationGrid.set(x, y, value);
-//            }
-//        }
-//    }
     public void importTiffVegRasterMap() throws IOException {
-        String tifVegRasterMapFile = OutputWriter.getFileName("/RESET_TLB_inputData/vegRaster_Tamarisk_20240730.tif");
-        File tiffVegRaster_tamarisk = new File(tifVegRasterMapFile);
+        String tifVegRasterMapFile = OutputWriter.getFileName("/RESET_TLB_inputData/vegRaster_Tamarisk_20240730.tif", true);
+        File tiffVegRaster_tamarisk = new File(tifVegRasterMapFile); //create a file object from the raster file path
 
-        GeoTiffReader reader = new GeoTiffReader(tiffVegRaster_tamarisk); //read the tiff file
-        GridCoverage2D cov = reader.read(null);
+        GeoTiffReader reader = new GeoTiffReader(tiffVegRaster_tamarisk); //read the contents of Geotiff file
+        GridCoverage2D cov = reader.read(null); //read the raster data as a GridCoverage2D object (which contains both image and spatial metadata)
 
-        this.vegetationRaster = cov.getRenderedImage().getData(); //just keep the raster
+        this.vegetationRaster = cov.getRenderedImage().getData(); //Extract only the raster image data (as a Raster object) and store it in the class field `vegetationRaster`
+        // Store the grid-to-world coordinate transformation info from the coverage
+        // This is useful for converting between pixel indices and geographic coordinates
         this.gridGeometry = cov.getGridGeometry(); //needed for the world --grid conversion
 
         System.out.println("Raster bounds: " + vegetationRaster.getBounds()); //get x, y bounds
@@ -218,20 +188,26 @@ public class TLBEnvironment extends SimState {
     *                                        MAKE AGENTS IN THE SPACE
     * **************************************************************************************************
      */
-    public void makeAgentsInSpace() throws TransformException {
-//        int vegGridX = CoordinateConverter.longitudeXtoGridX(initialLon, xllcornerVeg, vegCellSize);
-//        int vegGridY = CoordinateConverter.latitudeYtoGridY(initialLat, yllcornerVeg, vegCellSize, nRowsVeg);
-        int vegGridX = CoordinateConverter.coordToGrid(crs, gridGeometry, initialLon, initialLat)[0];
-        int vegGridY = CoordinateConverter.coordToGrid(crs, gridGeometry, initialLon, initialLat)[1];
-
-        for (int i=0; i<initialN; i++) {
-            tlbAgentID ++;
-            int patchID = getPatchID(this, vegGridX, vegGridY); //get the patchID based on current location
-            int tlbAge = random.nextInt(3) + 5; //randomly choose a range between 5-7 for adult
-            TLBAgent a = new TLBAgent(this, tlbAgentID, Stage.TLBADULT, initialLon, initialLat, patchID, tlbAge);
-            System.out.println("Agent #" + tlbAgentID + " is an " + a.tlbStage + " in initiation");
-            a.event = schedule.scheduleRepeating(a);
-            agentGrid.setObjectLocation(a, a.displayLocation);
+    public void makeAgentsInSpace() throws IOException {
+        String startLocations = OutputWriter.getFileName("/RESET_TLB_inputData/TLB_invasion_loc.csv", true);
+        InputDataParser parser = new InputDataParser(startLocations); //initiate a new inputDataParser class
+        Map<Integer, InfoIdentifier> initialInfo = parser.getDataInformation(); //get all groupInfo
+        int nInitialLocations = initialInfo.size(); // # of initial location
+        System.out.println("nInitialLocations: " + nInitialLocations);
+        for (int i=1; i<= nInitialLocations; i++) {
+            InfoIdentifier info = initialInfo.get(i);
+            double initialLon = info.getInputX();
+            double initialLat = info.getInputY();
+            int patchID = info.getPatchID();
+            int nAgentsAtInitLocation = 10;
+            for(int j=0; j<nAgentsAtInitLocation; j++) {
+                tlbAgentID ++;
+                int tlbAge = random.nextInt(3) + 5; //randomly choose a range between 5-7 for adult
+                TLBAgent a = new TLBAgent(this, tlbAgentID, Stage.TLBADULT, initialLon, initialLat, patchID, tlbAge);
+                System.out.println("Agent #" + tlbAgentID + " is an " + a.tlbStage + " in initiation");
+                a.event = schedule.scheduleRepeating(a);
+                agentGrid.setObjectLocation(a, a.displayLocation);
+            }
         }
     }
 
@@ -257,11 +233,6 @@ public class TLBEnvironment extends SimState {
             return patchID;
         }
     }
-
-//    public TLBVegCell getVegMapCell(int vegGridX, int vegGridY) {
-//        String mapKey = String.join("-", String.valueOf(vegGridX), String.valueOf(vegGridY));
-//        return this.vegMapCell.get(mapKey);
-//    }
 
     /*
     ************************************************************************************************
@@ -301,29 +272,29 @@ public class TLBEnvironment extends SimState {
         this.impactFile = impactFile;
     }
 
-    public int getInitialN() {
-        return initialN;
-    }
+//    public int getInitialN() {
+//        return initialN;
+//    }
+//
+//    public void setInitialN(int initialN) {
+//        this.initialN = initialN;
+//    }
 
-    public void setInitialN(int initialN) {
-        this.initialN = initialN;
-    }
-
-    public double getInitialLon() {
-        return initialLon;
-    }
-
-    public void setInitialLon(double initialLon) {
-        this.initialLon = initialLon;
-    }
-
-    public double getInitialLat() {
-        return initialLat;
-    }
-
-    public void setInitialLat(double initialLat) {
-        this.initialLat = initialLat;
-    }
+//    public double getInitialLon() {
+//        return initialLon;
+//    }
+//
+//    public void setInitialLon(double initialLon) {
+//        this.initialLon = initialLon;
+//    }
+//
+//    public double getInitialLat() {
+//        return initialLat;
+//    }
+//
+//    public void setInitialLat(double initialLat) {
+//        this.initialLat = initialLat;
+//    }
 
     public double getMpAntPre() {
         return mpAntPre;
@@ -355,14 +326,6 @@ public class TLBEnvironment extends SimState {
 
     public void setMpPatchTamariskForLaying(int mpPatchTamariskForLaying) {
         this.mpPatchTamariskForLaying = mpPatchTamariskForLaying;
-    }
-
-    public int getMpCriticalDayLength() {
-        return mpCriticalDayLength;
-    }
-
-    public void setMpCriticalDayLength(int mpCriticalDayLength) {
-        this.mpCriticalDayLength = mpCriticalDayLength;
     }
 
     public double getMpTlbDisperse() {

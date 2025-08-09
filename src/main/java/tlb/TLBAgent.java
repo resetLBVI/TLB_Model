@@ -29,7 +29,8 @@ public class TLBAgent implements Steppable {
     int tlbAge; //indicate the current age (in weeks/ticks)
     //diapause
     boolean tlbDiapause; //determine the agent involve in the diapause or not
-    double tlbCurrDayLeng; //the current daylength for the week and at their (tlbLat)
+    double currentDayLeng; //the current daylength for the week and at their (tlbLat)
+    double tlbCDL; //critical day length at agent's location
     //movement (dispersal)
     double tlbDispDist; //dispersal distance (m)
     double tlbDispDir; //dispersal direction (degree)
@@ -39,7 +40,7 @@ public class TLBAgent implements Steppable {
     //veg defoliation
     TLBVegCell tlbHostCell; //an agent claim a veg cell when they feed on the foliage
     int patchID; //the patch ID an agent occupied
-    TamariskLookup tamariskLookup;
+//    TamariskLookup tamariskLookup;
     double currentPTamarisk;
     //other schedule variables
     Stoppable event; //schedule to stop the event
@@ -70,6 +71,7 @@ public class TLBAgent implements Steppable {
         this.displayLocation = new Int2D(displayX, displayY);
         this.tlbAge = tlbAge;
         this.tlbDiapause = false;
+        this.tlbCDL = 0;
         this.tlbSpawn = state.random.nextInt(state.mpTlbSpawn);
         this.patchID = patchID;
         this.currentPTamarisk = 0;
@@ -84,6 +86,7 @@ public class TLBAgent implements Steppable {
         System.out.println("tlbLonX: " + tlbLonX + ", tlbLatY: " + tlbLatY);
         System.out.println("vegGridX: " + vegGridX + ", vegGridY: " + vegGridY);
         System.out.println("displayLocation: " + displayLocation);
+        System.out.println( "patchID: " + patchID);
 
     }
 
@@ -91,6 +94,7 @@ public class TLBAgent implements Steppable {
     public void step(SimState state) {
         TLBEnvironment eState = (TLBEnvironment) state; //Downcasting the PSHB Environment
         currentStep = eState.schedule.getSteps(); //get the current step, each step represents a week
+        eState.debugWriter.addToFile("========Agent " + this.tlbAgentID + " has started current step = " + currentStep + "========");
         System.out.println("========Agent " + this.tlbAgentID + " has started current step = " + currentStep + "========"); //print in console
         //Step 1: check the age, if the age hit the maxAge, the agent died
         if (tlbAge == 0) { //egg stage
@@ -105,13 +109,14 @@ public class TLBAgent implements Steppable {
             death(eState);
             return;
         }
+        eState.debugWriter.addToFile("this tlbStage: " + tlbStage + "   tlbLonX: " + tlbLonX + "   tlbLatY: " + tlbLatY + "     patchID: " + patchID);
         System.out.println("this tlbStage: " + tlbStage);
         //Step 2: Take actions, perform the actions according to their stage
         takeAction(this.tlbStage, eState); //taking actions according to their stages
         System.out.println("action executed: " + this.actionExecuted); //debug
         //Step 3: testing and logging
-        String agentStepLog = String.format("%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s", currentStep, eState.currentWeek, eState.currentYear, this.tlbAgentID,
-                this.tlbStage, this.tlbAge, this.tlbLonX, this.tlbLatY, this.vegGridX, this.vegGridY, this.displayX, this.displayY,
+        String agentStepLog = String.format("%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s", currentStep, eState.currentWeek, eState.currentYear, this.tlbAgentID,
+                this.tlbStage, this.tlbAge, this.tlbLonX, this.tlbLatY, this.vegGridX, this.vegGridY, this.displayX, this.displayY, this.patchID,
                 this.actionExecuted);
         eState.logWriter.addToFile(agentStepLog);
         this.actionExecuted = "null"; //reset the action executed
@@ -129,52 +134,72 @@ public class TLBAgent implements Steppable {
                 //check diapause
                 if (checkDiapause(state)) { //if diapause == true, there is 50% die and 50% pause all actions
                     if(state.random.nextBoolean()) {
+                        state.debugWriter.addToFile("this ADULT agent is dead"); //debug
                         System.out.println ("this ADULT agent is dead"); //debug
                         this.actionExecuted = "ADULT:diapause_death"; //log
                         state.numDeath ++;
                         death(state);
                     } else { //if not died, do nothing for the step
-                        System.out.println("this ADULT agent is during diapause");
+                        state.debugWriter.addToFile("this ADULT agent is during diapause"); //debug
+                        System.out.println("this ADULT agent is during diapause"); //console
                         this.actionExecuted = "ADULT:diapause_survived"; //log
                         return;
                     }
                 } else { //if the diapause == false, the agent can execute actions
                     //During the ADULT stage, agents disperse, feed, and lay eggs
-                    dispersal (state); //execute dispersal action
-                    if (this.currentPTamarisk > 1) {
-                        feed_colonizeACell(state);
-                        laying(state,this);
-                        this.actionExecuted = "ADULT:dispersal_feed_laying"; //log
+                    if (this.currentPTamarisk == 0) {
+                        dispersal (state); //execute dispersal action
+                        state.debugWriter.addToFile("ADULT: dispersal to a new location"); //debug
+                        System.out.println("ADULT: dispersal to a new location"); //console
+                        this.actionExecuted = "ADULT: dispersal to a new location"; //log
                     } else if (this.currentPTamarisk == 1) {
                         feed_colonizeACell(state);
-                        this.actionExecuted = "ADULT:dispersal_feed"; //log
+                        state.debugWriter.addToFile("ADULT: feed"); //debug
+                        System.out.println("ADULT: feed"); //console
+                        this.actionExecuted = "ADULT: feed"; //log
+                    } else if (this.currentPTamarisk == 2) {
+                        feed_colonizeACell(state);
+                        laying(state,this);
+                        state.debugWriter.addToFile("ADULT: feed + laying"); //debug
+                        System.out.println("ADULT: feed + laying"); //console
+                        this.actionExecuted = "ADULT: feed + laying"; //log
                     }
                 }
                 break;
             case TLBEGG:
                 //mortality: (1) diapause (2) ant predation
                 if(checkDiapause(state) || state.random.nextBoolean(state.mpAntPre)) { //diapause and ant predation cause the death
+                    state.debugWriter.addToFile("EGG:mortality"); //debug
+                    System.out.println("EGG:mortality"); //console
                     this.actionExecuted = "EGG:mortality"; //log
                     state.numDeath ++;
                     death(state);
                     return;
                 }
                 //During the EGG stage, the agents that survive to hatch enter the LARVA stage
+                state.debugWriter.addToFile("EGG:survived"); //debug
+                System.out.println("EGG:survived"); //console
                 this.actionExecuted = "EGG:survived"; //log
                 break;
             case TLBLARVA:
                 //mortality: (1) diapause (2) ant predation
                 if(checkDiapause(state) || state.random.nextBoolean(state.mpAntPre)) { //diapause and ant predation cause the death
+                    state.debugWriter.addToFile("LARVA:mortality"); //debug
+                    System.out.println("LARVA:mortality"); //console
                     this.actionExecuted = "LARVA:mortality"; //log
                     state.numDeath ++;
                     death(state);
                 }
                 //check the vegetation quality to see if the agent will die
                 if(this.currentPTamarisk == 0) {
+                    state.debugWriter.addToFile("LARVA:poorTamariskPatch_death"); //debug
+                    System.out.println("LARVA:poorTamariskPatch_death"); //console
                     this.actionExecuted = "LARVA:poorTamariskPatch_death"; //log
                     state.numDeath ++;
                     death(state);
                 } else { //if the patchPercentTamarisk >=1
+                    state.debugWriter.addToFile("LARVA:feed"); //debug
+                    System.out.println("LARVA:feed"); //console
                     this.actionExecuted = "LARVA:feed"; //log
                     feed_colonizeACell(state);
                 }
@@ -182,11 +207,15 @@ public class TLBAgent implements Steppable {
             case TLBPUPA:
                 //mortality: (1) diapause (2) ant predation
                 if(checkDiapause(state) || state.random.nextBoolean(state.mpAntPre)) { //diapause and ant predation cause the death
+                    state.debugWriter.addToFile("PUPA:mortality"); //debug
+                    System.out.println("PUPA:mortality"); //console
                     this.actionExecuted = "PUPA:mortality"; //log
                     state.numDeath ++;
                     death(state);
                 }
-                this.actionExecuted = "PUPA:survived";
+                state.debugWriter.addToFile("PUPA:survived"); //debug
+                System.out.println("PUPA:survived"); //console
+                this.actionExecuted = "PUPA:survived"; //log
                 break;
             default:
                 System.out.println("Unknown TLB stage");
@@ -209,11 +238,12 @@ public class TLBAgent implements Steppable {
     public boolean checkDiapause(TLBEnvironment state) {
         //check current day length by using look-up table
         double currentLat = this.tlbLatY;
-//        System.out.println(" currentWeek: " + state.currentWeek);
-        tlbCurrDayLeng = getDayLength(currentLat, state.currentWeek);
-//        System.out.println("check Diapause - Latitude: " + currentLat + ", Week: " + state.currentWeek + ", Day Length: " + tlbCurrDayLeng);
+        currentDayLeng = getDayLength(currentLat, state.currentWeek);
+        tlbCDL = 0.0451* currentLat + 12.904;
+        state.debugWriter.addToFile("check Diapause - Latitude: " + currentLat + ", currentDayLength: " + currentDayLeng + "   tlbCDL: "  + tlbCDL);
+        System.out.println("check Diapause - Latitude: " + currentLat + ", currentDayLength: " + currentDayLeng + "   tlbCDL: "  + tlbCDL);
         //check whether they are at the autumnal equinox (week > 39) and the day length
-        if(state.currentWeek > 39 && tlbCurrDayLeng <= state.mpCriticalDayLength) { //if the current day length is not long enough, go diapause
+        if(state.currentWeek > 39 && currentDayLeng <= tlbCDL) { //if the current day length is not long enough, go diapause
             System.out.println("diapause == true");
             return true;
         } else {
@@ -232,33 +262,22 @@ public class TLBAgent implements Steppable {
      */
     public void dispersal(TLBEnvironment state) {
         //determine the distance, direction, and move to the new location
-        System.out.println("This agent starts to disperse, before location vegGridX: " + vegGridX + ", vegGridY: " + vegGridY); //debug
-        findANewLocation(state); //provide a new location (vegGridX, vegGridY)
-//        System.out.println("dispersal new location vegGridX: " + vegGridX + " vegGridY: " + vegGridY); //print the current location
-//        System.out.println("new display location: " + displayX + ", " + displayY); //debug
-        // Read raster value, which is the patch ID if there is one
-        this.patchID = state.getPatchID(state, vegGridX, vegGridY);
-        if (this.patchID == -1 || this.patchID == 0) {// if agents disperse to a place beyond RESET (patches), the agent die
-            System.out.println("patch ID= " + this.patchID + "this agent is out of RESET area and dies."); //the value is the patch ID
-            state.numDeath ++;
-            this.actionExecuted = "ADULT: disperseOutsideRESET_death";
-            death(state);
-            return;
-        }
-        System.out.println("patch ID in the RESET: " + this.patchID); //the value is the patch ID
+//        System.out.println("This agent starts to disperse, before location vegGridX: " + vegGridX + ", vegGridY: " + vegGridY); //debug
+        //(1) step 1: find a new location
+        findANewLocation(state); //provide a new location (vegGridX, vegGridY); if outside RESET, execute death();
         // (2) read the patch quality from the vegetation patch
-        this.currentPTamarisk = tamariskLookup.getPTamarisk(this.patchID);
-        //(3) return current percentage of tamarisk (0-9)
+        this.currentPTamarisk = TamariskLookup.getPTamarisk(this.patchID); //get the current tamarisk quality
+        state.debugWriter.addToFile("Tamarisk Quality in dispersal - patchID: " + this.patchID + "  currentPTamarisk: " + currentPTamarisk);
+        System.out.println("Tamarisk Quality in dispersal - patchID: " + this.patchID + "currentPTamarisk: " + currentPTamarisk);
+
     }
     public void findANewLocation (TLBEnvironment state) {
         //get current location vegGridX and vegGrids
         //determine the dispersal distance and direction
-        exponentialGenerator = new ExponentialDistribution(state.mpTlbDisperse*500); //create a negative exponential distribution
+        exponentialGenerator = new ExponentialDistribution(state.mpTlbDisperse); //create a negative exponential distribution
         tlbDispDist = exponentialGenerator.sample(); //the movement distance follows an exponential distribution, sample from the distribution
         Random random = new Random();
         this.tlbDispDir = random.nextDouble() * 2 * Math.PI; //randomly choose a direction in degrees
-        //debug
-//        System.out.println("tlbDispDir: " + tlbDispDir + "; tlbDispDist: " + tlbDispDist);
         //move to the new location
         this.tlbLonX = this.tlbLonX + tlbDispDist * Math.cos(tlbDispDir); //new coordinate X
         this.tlbLatY = this.tlbLatY + tlbDispDist * Math.sin(tlbDispDir); //new coordinate Y
@@ -268,6 +287,17 @@ public class TLBAgent implements Steppable {
         displayX = CoordinateConverter.getVegToDisplayX(state, vegGridX);
         displayY = CoordinateConverter.getVegToDisplayY(state, vegGridY);
         state.agentGrid.setObjectLocation(this, displayX, displayY); //set the agent location on the display
+        // Read raster value, which is the patch ID if there is one
+        this.patchID = state.getPatchID(state, vegGridX, vegGridY);
+        if (this.patchID == -1 || this.patchID == 0) {// if agents disperse to a place beyond RESET (patches), the agent die
+            state.debugWriter.addToFile("find A New Loc - patchID= " + this.patchID + "this agent is out of RESET area and dies.");
+            System.out.println("find A New Loc - patchID= " + this.patchID + "this agent is out of RESET area and dies."); //the value is the patch ID
+            state.numDeath ++;
+            state.debugWriter.addToFile("ADULT: disperseOutsideRESET_death"); //debug
+            System.out.println("ADULT: disperseOutsideRESET_death"); //console
+            this.actionExecuted = "ADULT: disperseOutsideRESET_death"; //log
+            death(state);
+        }
     }
 
 
@@ -279,19 +309,18 @@ public class TLBAgent implements Steppable {
 
 
     public void feed_colonizeACell(TLBEnvironment state) {
-        System.out.println("This agent colonize a cell and feed.");//debug
+//        System.out.println("This agent colonize a cell and feed.");//debug
         if(this.patchID != 0 ) { //this grid is within RESET area
             TLBVegCell cell = (TLBVegCell) state.vegCellGrid.get(vegGridX, vegGridY);
             //add the agent into the cell, activate a new cell or join a current active cell
             if (cell == null) {
                 //activate a new cell
                 Bag members = new Bag();
-                TLBVegCell newActiveCell = new TLBVegCell(members, vegGridX, vegGridY, this.patchID, 0, false); //activate a new veg cell
+                TLBVegCell newActiveCell = new TLBVegCell(state, members, vegGridX, vegGridY, this.patchID, 0, false); //activate a new veg cell
                 state.vegCellGrid.set(vegGridX, vegGridY, newActiveCell); //set the cell on the vegCellGrid
                 newActiveCell.addCellMembers(this); //add this member into the entity
             } else { //if there is already someone in the location
                 cell.addCellMembers(this);
-                state.agentGrid.setObjectLocation(cell, vegGridX, vegGridY); //set the entity in the space
             }
         }
     }
@@ -304,14 +333,18 @@ public class TLBAgent implements Steppable {
      */
 
     public void laying(TLBEnvironment state, TLBAgent parent) {
-        System.out.println("This agent is laying an egg.");//debug
+//        System.out.println("This agent is laying an egg.");//debug
         double tlbLonX_newborn = parent.tlbLonX; //determine the longitude X for the newborn
         double tlbLatY_newborn = parent.tlbLatY; //determine the latitude Y for the newborn
         for (int i=0; i<parent.tlbSpawn; i++) {
-            state.tlbAgentID ++; //provide an unique ID for the newborn
+            int newbornID = state.tlbAgentID ++; //provide an unique ID for the newborn
             int patchID_newborn = parent.patchID; //the eggs will be in the same patch as the parents
-            TLBAgent a = new TLBAgent(state, tlbAgentID, Stage.TLBEGG, tlbLonX_newborn, tlbLatY_newborn, patchID_newborn, 0); //create a newborn
-            System.out.println ("tlbAgentID: " + tlbAgentID + " has started his life at step " + currentStep);
+            TLBAgent a = new TLBAgent(state, newbornID, Stage.TLBEGG, tlbLonX_newborn, tlbLatY_newborn, patchID_newborn, 0); //create a newborn
+            a.event = state.schedule.scheduleRepeating(a);
+            state.agentGrid.setObjectLocation(a, a.displayLocation);
+            state.debugWriter.addToFile(parent.tlbAgentID + "   has created a newborn! Newborn ID: " + a.tlbAgentID); //debug
+            System.out.println (parent.tlbAgentID + "   has created a newborn! Newborn ID: " + a.tlbAgentID); //console
+            a.actionExecuted = "born!"; //log
             a.dateData.put("birthday", currentStep); //record the birthday
             a.locationData.put("lonAtBirth", tlbLonX_newborn); //record the x location of the newborn
             a.locationData.put("latAtBirth", tlbLonX_newborn); //record the y location of the newborn
@@ -335,19 +368,15 @@ public class TLBAgent implements Steppable {
         this.stageData.put("deathStage", this.tlbStage); //record the death stage
         this.ageData.put("deathAge",this.tlbAge);//record the death age
         //create a String list that can store all the information
-        String lifeHistoryInfo = String.format("%s,%s,%s,%s,%s,%s,%s,%s,%s,%s", currentStep, this.tlbAgentID,
+        String lifeHistoryInfo = String.format("%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s", currentStep, this.tlbAgentID,
                 this.dateData.get("birthday"), this.dateData.get("dateOfDeath"), this.locationData.get("lonAtBirth"),
-                this.locationData.get("latAtBirth"), this.locationData.get("lonAtDeath"), this.locationData.get("latAtDeath"),
+                this.locationData.get("latAtBirth"), this.locationData.get("patchAtBirth"), this.locationData.get("lonAtDeath"), this.locationData.get("latAtDeath"),
                 this.stageData.get("deathStage"), this.ageData.get("deathAge"));
         state.agentSummaryWriter.addToFile(lifeHistoryInfo); //add the information into file
         //stop the event
         event.stop();
     }
 
-//    public void outsideRESET() {
-//        event.stop();
-//        this.TLBVegCell =
-//    }
 
     /*
     *********************************************************************************
