@@ -2,7 +2,7 @@
 <project version="4">
   <component name="ProjectModuleManager">
     <modules>
-      <module fileurl="file://$PROJECT_DIR$/RESET_TLB_20250509.iml" filepath="$PROJECT_DIR$/RESET_TLB_20250509.iml" />
+      <module fileurl="file://$PROJECT_DIR$/.idea/pom.xml.iml" filepath="$PROJECT_DIR$/.idea/pom.xml.iml" />
     </modules>
   </component>
 </project>

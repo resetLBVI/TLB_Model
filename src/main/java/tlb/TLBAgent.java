@@ -139,6 +139,7 @@ public class TLBAgent implements Steppable {
                         this.actionExecuted = "ADULT:diapause_death"; //log
                         state.numDeath ++;
                         death(state);
+                        return;
                     } else { //if not died, do nothing for the step
                         state.debugWriter.addToFile("this ADULT agent is during diapause"); //debug
                         System.out.println("this ADULT agent is during diapause"); //console
@@ -163,6 +164,8 @@ public class TLBAgent implements Steppable {
                         state.debugWriter.addToFile("ADULT: feed + laying"); //debug
                         System.out.println("ADULT: feed + laying"); //console
                         this.actionExecuted = "ADULT: feed + laying"; //log
+                    } else {
+                        System.out.println("ADULT: Tamarisk health is unknown so the agent did nothing.");
                     }
                 }
                 break;
@@ -189,6 +192,7 @@ public class TLBAgent implements Steppable {
                     this.actionExecuted = "LARVA:mortality"; //log
                     state.numDeath ++;
                     death(state);
+                    return;
                 }
                 //check the vegetation quality to see if the agent will die
                 if(this.currentPTamarisk == 0) {
@@ -197,6 +201,7 @@ public class TLBAgent implements Steppable {
                     this.actionExecuted = "LARVA:poorTamariskPatch_death"; //log
                     state.numDeath ++;
                     death(state);
+                    return;
                 } else { //if the patchPercentTamarisk >=1
                     state.debugWriter.addToFile("LARVA:feed"); //debug
                     System.out.println("LARVA:feed"); //console
@@ -212,6 +217,7 @@ public class TLBAgent implements Steppable {
                     this.actionExecuted = "PUPA:mortality"; //log
                     state.numDeath ++;
                     death(state);
+                    return;
                 }
                 state.debugWriter.addToFile("PUPA:survived"); //debug
                 System.out.println("PUPA:survived"); //console
@@ -243,7 +249,7 @@ public class TLBAgent implements Steppable {
         state.debugWriter.addToFile("check Diapause - Latitude: " + currentLat + ", currentDayLength: " + currentDayLeng + "   tlbCDL: "  + tlbCDL);
         System.out.println("check Diapause - Latitude: " + currentLat + ", currentDayLength: " + currentDayLeng + "   tlbCDL: "  + tlbCDL);
         //check whether they are at the autumnal equinox (week > 39) and the day length
-        if(state.currentWeek > 39 && currentDayLeng <= tlbCDL) { //if the current day length is not long enough, go diapause
+        if(state.currentWeek > 25 && currentDayLeng <= tlbCDL) { //if the current day length is not long enough, go diapause
             System.out.println("diapause == true");
             return true;
         } else {

@@ -28,7 +28,10 @@ bin/
 ### Mac OS ###
 .DS_Store
 
-# IntelliJ IDEA
+### IntelliJ IDEA ###
 .idea/
 *.iml
 out/
+
+### maven ###
+target/
