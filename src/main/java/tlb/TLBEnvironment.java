@@ -1,7 +1,6 @@
 package tlb;
 
 
-import org.geotools.api.referencing.crs.CoordinateReferenceSystem;
 import org.geotools.coverage.grid.GridCoverage2D;
 import org.geotools.coverage.grid.GridGeometry2D;
 import org.geotools.gce.geotiff.GeoTiffReader;
@@ -16,6 +15,7 @@ import tlb.Utils.*;
 import java.awt.image.Raster;
 import java.io.File;
 import java.io.IOException;
+import java.util.HashMap;
 import java.util.Map;
 import static tlb.Utils.DayLengthLookup.loadDayLengthCsv;
 
@@ -34,7 +34,8 @@ public class TLBEnvironment extends SimState {
     //Environmental parameters are global
     public SparseGrid2D agentGrid; //UI grid
     public SparseGrid2D backgroundGrid; //UI grid
-    public ObjectGrid2D vegCellGrid; //efficient only if most cells are empty. For placing veg cell objects sparsely
+    public ObjectGrid2D territoryGrid; // spatial lookup: (vegGridX, vegGridY) → TLBTerritory
+    public Map<Integer, TLBTerritory> territoriesByID = new HashMap<>(); // terrID → TLBTerritory
     int displayWidth = 100;
     int displayHeight = 100;
 //    double initialLon = 377950.966434972;
@@ -44,13 +45,16 @@ public class TLBEnvironment extends SimState {
     double yllcornerVeg = -695325 + 15;
     int vegCellSize = 30;
     int nRowsVeg = 23518;
+    //vegetation (tamarisk) attributes info
+    public Map<Integer, VegAttributes> tamariskInfo;
     //veg map instance variables
     public Raster vegetationRaster;
     public GridGeometry2D gridGeometry;
     //Agent state variables
     int tlbAgentID = 0;
     //mortality
-    double mpAntPre = 0.5; //the probability an agent is predated by ants
+    double mpAntPredation = 0.01; //the probability an agent is predated by ants
+    double mpTlbMort = 0.1; //the basic mortality of TLB agents dying at each life stage 2026-03-06
     double mpProbDiapauseDeath = 0.1;
     //reproduction
     int mpTlbSpawn = 5; //the maximum number of eggs
@@ -68,6 +72,7 @@ public class TLBEnvironment extends SimState {
     //Scheduling
     int currentYear = 0; //simulation period is 35 years from 0-34;
     int currentWeek = 0; //the week is from 0-51 in the current year
+    int mpTamariskBud = 8; //the week when Tamarisk start to bud from dormancy 2026-03-04
     //Population summary data
     int populationSize = 0; //current population size
     int numBirth = 0; //number of birth within a year
@@ -121,9 +126,9 @@ public class TLBEnvironment extends SimState {
             System.out.println(dayLengthFilePath);
             loadDayLengthCsv(dayLengthFilePath);
             //(7) load the tamarisk data
-            String patchTamariskFilePath = OutputWriter.getFileName("/RESET_TLB_inputData/patch_tamarisk.csv", true);
+            String patchTamariskFilePath = OutputWriter.getFileName("/RESET_TLB_inputData/TLB territory attributes.csv", true);
             this.tamariskLookup = new TamariskLookup();
-            tamariskLookup.loadPatchTamariskCSV(patchTamariskFilePath);
+            tamariskInfo = tamariskLookup.loadPatchTamariskCSV(patchTamariskFilePath);
             //(8) create a background grid
             backgroundGrid = new SparseGrid2D(displayWidth, displayHeight);
             Object backgoundAnchor = new Object();
@@ -135,9 +140,26 @@ public class TLBEnvironment extends SimState {
             } else {
                 System.out.println("No object at (0,0)");
             }
-            //(9) Initiate other field s (e.g., agentGrid)
-            this.vegCellGrid = new ObjectGrid2D(vegetationRaster.getWidth(), vegetationRaster.getHeight());
+            //(9) Initiate agentGrid
             this.agentGrid = new SparseGrid2D(displayWidth, displayHeight);
+            //(9b) Build territory grid from territory raster (pixel value = terrID)
+            // TODO: replace vegetationRaster with territory raster once territory TIF is available
+            this.territoryGrid = new ObjectGrid2D(vegetationRaster.getWidth(), vegetationRaster.getHeight());
+            for (int x = 0; x < vegetationRaster.getWidth(); x++) {
+                for (int y = 0; y < vegetationRaster.getHeight(); y++) {
+                    int terrID = getTerrIDByLoc(this, x, y);
+                    if (terrID <= 0) continue;
+                    if (!territoriesByID.containsKey(terrID)) {
+                        // TODO: look up territory attributes by terrID from CSV once territory raster is confirmed
+                        TLBTerritory terr = new TLBTerritory(this, terrID, 0, 0, 0.0, 0.0, false);
+                        terr.event = schedule.scheduleRepeating(terr);
+                        territoriesByID.put(terrID, terr);
+                    }
+                    TLBTerritory terr = territoriesByID.get(terrID);
+                    terr.memberCells.add(new Int2D(x, y)); // record pixel coordinates belonging to this territory
+                    territoryGrid.set(x, y, terr);
+                }
+            }
 
         } catch (IOException e) {
             throw new RuntimeException(e);
@@ -158,7 +180,7 @@ public class TLBEnvironment extends SimState {
     }
 
     public void importTiffVegRasterMap() throws IOException {
-        String tifVegRasterMapFile = OutputWriter.getFileName("/RESET_TLB_inputData/vegRaster_Tamarisk_20240730.tif", true);
+        String tifVegRasterMapFile = OutputWriter.getFileName("/RESET_TLB_inputData/pseudoterr_raster.tif", true); //2026-03-21
         File tiffVegRaster_tamarisk = new File(tifVegRasterMapFile); //create a file object from the raster file path
 
         GeoTiffReader reader = new GeoTiffReader(tiffVegRaster_tamarisk); //read the contents of Geotiff file
@@ -199,11 +221,12 @@ public class TLBEnvironment extends SimState {
             double initialLon = info.getInputX();
             double initialLat = info.getInputY();
             int patchID = info.getPatchID();
+            int terrID = info.getTerrID();
             int nAgentsAtInitLocation = 10;
             for(int j=0; j<nAgentsAtInitLocation; j++) {
                 tlbAgentID ++;
                 int tlbAge = random.nextInt(3) + 5; //randomly choose a range between 5-7 for adult
-                TLBAgent a = new TLBAgent(this, tlbAgentID, Stage.TLBADULT, initialLon, initialLat, patchID, tlbAge);
+                TLBAgent a = new TLBAgent(this, tlbAgentID, Stage.TLBADULT, initialLon, initialLat, patchID, terrID, tlbAge, 0);
                 System.out.println("Agent #" + tlbAgentID + " is an " + a.tlbStage + " in initiation");
                 a.event = schedule.scheduleRepeating(a);
                 agentGrid.setObjectLocation(a, a.displayLocation);
@@ -216,7 +239,7 @@ public class TLBEnvironment extends SimState {
     *                          Get Values from VegRasterMap or Table
     * *************************************************************************************************
      */
-    public int getPatchID(TLBEnvironment state, int vegGridX, int vegGridY) {
+    public int getPatchIDByLoc(TLBEnvironment state, int vegGridX, int vegGridY) {
         int[] hostRasterData = new int[1];
         int patchID = 0;
         //check Coordinates before access the raster info
@@ -229,8 +252,26 @@ public class TLBEnvironment extends SimState {
             return 0;
         } else { //it's a patch, return the patchID
             patchID = hostRasterData[0];
-            System.out.println("patchID: " + patchID);
+//            System.out.println("patchID: " + patchID);
             return patchID;
+        }
+    }
+
+    public int getTerrIDByLoc(TLBEnvironment state, int vegGridX, int vegGridY) {
+        int[] hostRasterData = new int[1];
+        int terrID = 0;
+        //check Coordinates before access the raster info
+        if (vegGridX < 0 || vegGridX >= vegetationRaster.getWidth() || vegGridY < 0 || vegGridY >= vegetationRaster.getHeight()) {
+            System.err.println("Coordinate out of bounds: x=" + vegGridX + ", y=" + vegGridY);
+            return -1; // or some default/fallback value
+        }
+        state.vegetationRaster.getPixel(vegGridX, vegGridY, hostRasterData);
+        if (hostRasterData[0] >= 100000) { //not a patch (the patch # is between 1-22384)
+            return 0;
+        } else { //it's a patch, return the patchID
+            terrID = hostRasterData[0];
+            System.out.println("terrID: " + terrID);
+            return terrID;
         }
     }
 
@@ -296,12 +337,12 @@ public class TLBEnvironment extends SimState {
 //        this.initialLat = initialLat;
 //    }
 
-    public double getMpAntPre() {
-        return mpAntPre;
+    public double getMpAntPredation() {
+        return mpAntPredation;
     }
 
-    public void setMpAntPre(double mpAntPre) {
-        this.mpAntPre = mpAntPre;
+    public void setMpAntPredation(double mpAntPredation) {
+        this.mpAntPredation = mpAntPredation;
     }
 
     public double getMpProbDiapauseDeath() {

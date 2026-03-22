@@ -1,23 +1,22 @@
-# 🚀 Project Title
+# Project Title
 The Tamarisk Leaf Beetle Agent-Based Model
 
-## 📂 Project Structure
+## Project Structure
 Please see `structure.txt`
 
-## 🛠️ Tech Stack
-
+## Tech Stack
 - Language: Java .
 - Libraries: MASON / GeoTools / Commons Math.
 - Version Control: Git
 
-## 📌 Setup Instructions
+## Setup Instructions
 
 1. Clone the repo: Open your terminal (macOS/Linux) or Git Bash (Windows), 
    then run:
     ```bash
    git clone https://github.com/resetLBVI/TLB_Model.git
     ```
-2. Download the input data from Google Drive and save both files in the same dictory
+2. Download the input data from Google Drive and save both files in the same directory
 
 3. Run the project:
 
@@ -36,9 +35,6 @@ Please see `structure.txt`
 
 ## To-Do / Roadmap
 
-* [ ] Improve vegetation layer handling
-* [ ] Add cowbird behavior submodel
-* [ ] Validate model with Santa Clara dataset
 
 ---
 

@@ -36,10 +36,11 @@ public class InputDataParser {
         for(String[] lst:data){
             index ++; //key
             Integer patchID = Integer.valueOf(lst[0]); //first column
-            Double inputX = Double.valueOf(lst[1]); //second column
-            Double inputY = Double.valueOf(lst[2]); //third column
-            Double probInvade = Double.valueOf(lst[3]); //fourth column
-            InfoIdentifier invasionInfo = new InfoIdentifier(patchID, inputX, inputY, probInvade); //create an infoidentifier called groupInfo from input data
+            Integer terrID = Integer.parseInt(lst[1]); //second column
+            Double inputX = Double.valueOf(lst[2]); //third column
+            Double inputY = Double.valueOf(lst[3]); //fourth column
+            Double probInvade = Double.valueOf(lst[4]); // 5th column
+            InfoIdentifier invasionInfo = new InfoIdentifier(patchID, terrID, inputX, inputY, probInvade); //create an infoidentifier called groupInfo from input data
             this.info.put(index, invasionInfo); //add an index for each row
         }
         return this.info;
