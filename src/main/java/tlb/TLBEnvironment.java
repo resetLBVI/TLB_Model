@@ -115,7 +115,7 @@ public class TLBEnvironment extends SimState {
             this.popSummaryWriter = new OutputWriter(popSummaryFile);
             this.popSummaryWriter.createFile(popSummaryHeader);
             //(4) create impactFile
-            String[] impacDataHeader = {"year", "week", "type", "x", "y", "patchID, numOfDefoliations"}; //currently collect 4 data
+            String[] impacDataHeader = {"currentYear", "currentWeek", "terrID", "patchID", "pTamariskAtStart", "terrNTlb", "terrTamariskDensity", "terrNumDefoliation", "permanentlyDefoliated"}; //currently collect 4 data
             String impactFile = OutputWriter.getFileName(this.impactFile, false);
             this.impactWriter = new OutputWriter(impactFile);
             this.impactWriter.createFile(impacDataHeader);
