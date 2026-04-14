@@ -25,7 +25,6 @@ public class TLBTerritory implements Steppable {
 
     //Constructor
 
-
     public TLBTerritory(TLBEnvironment state, int terrID, int patchID, int terrNumDefoliation, double terrTamariskDensity,
                         double pTamarisk, boolean permanentlyDefoliated) {
         this.terrID = terrID;

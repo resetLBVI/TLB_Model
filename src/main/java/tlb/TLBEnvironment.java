@@ -67,7 +67,7 @@ public class TLBEnvironment extends SimState {
 //    Map<String, TLBVegCell> vegMapCell = new HashMap<String, TLBVegCell>(); //create a vegMapCell to contain the agent, location as the key
     int mpTlbFeed = 5; //the number of agents defoliate per time step - a threshold that reduced the patchPercentTamarisk by 1
     //vegetation state variables
-    int mpTlbCarb; //how many times a cell containing tamarisk can be defoliated before it stops growing
+    int mpTamariskPriorDefoliation = 0;
     TamariskLookup tamariskLookup;
     //Scheduling
     int currentYear = 0; //simulation period is 35 years from 0-34;
@@ -151,7 +151,7 @@ public class TLBEnvironment extends SimState {
                     if (terrID <= 0) continue;
                     if (!territoriesByID.containsKey(terrID)) {
                         // TODO: look up territory attributes by terrID from CSV once territory raster is confirmed
-                        TLBTerritory terr = new TLBTerritory(this, terrID, 0, 0, 0.0, 0.0, false);
+                        TLBTerritory terr = new TLBTerritory(this, terrID, 0, mpTamariskPriorDefoliation, 0.0, 0.0, false);
                         terr.event = schedule.scheduleRepeating(terr);
                         territoriesByID.put(terrID, terr);
                     }
@@ -385,12 +385,11 @@ public class TLBEnvironment extends SimState {
         this.mpTlbFeed = mpTlbFeed;
     }
 
-    public int getMpTlbCarb() {
-        return mpTlbCarb;
+    public int getMpTamariskPriorDefoliation() {
+        return mpTamariskPriorDefoliation;
     }
 
-    public void setMpTlbCarb(int mpTlbCarb) {
-        this.mpTlbCarb = mpTlbCarb;
+    public void setMpTamariskPriorDefoliation(int mpTamariskPriorDefoliation) {
+        this.mpTamariskPriorDefoliation = mpTamariskPriorDefoliation;
     }
-
 }
